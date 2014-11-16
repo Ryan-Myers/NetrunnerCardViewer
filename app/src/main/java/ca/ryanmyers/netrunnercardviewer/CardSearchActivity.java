@@ -1,5 +1,8 @@
 package ca.ryanmyers.netrunnercardviewer;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
@@ -9,6 +12,10 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.content.Context;
 import android.util.Log;
+import android.widget.ImageView;
+import android.widget.TableLayout;
+import android.widget.TableRow;
+import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,6 +27,7 @@ import java.net.URL;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 
 public class CardSearchActivity extends ActionBarActivity {
@@ -55,14 +63,14 @@ public class CardSearchActivity extends ActionBarActivity {
     /**
      * Downloads a single card's JSON async.
      */
-    private class DownloadCardTask extends AsyncTask<String[], Void, JSONArray> {
+    private class DownloadCardTask extends AsyncTask<String[], Void, Void> {
         @Override
-        protected JSONArray doInBackground(String[]... params) {
+        protected Void doInBackground(String[]... params) {
             try {
                 for (String[] param : params) {
                     //param[0] is the API to use
                     //param[1] is the code to use
-                    return readNetrunnerDB(param[0], param[1]);
+                    updateTableView(readNetrunnerDB(param[0], param[1]));
                 }
             } catch (JSONException e) {
                 Log.d(TAG, "JSONException: " + e.getMessage());
@@ -70,18 +78,79 @@ public class CardSearchActivity extends ActionBarActivity {
                 Log.d(TAG, "IOException: " + ioEx.getMessage());
             }
 
-            return new JSONArray();
+            return null;
         }
 
-        @Override
-        protected void onPostExecute(JSONArray card) {
+        protected void updateTableView(JSONArray card) {
             Log.d(TAG, "Card Finished: " + card.toString());
-            super.onPostExecute(card);
+            Context context = getApplicationContext();
+
+            //Declare this as final so that the thread at the end can access it.
+            final TableLayout tblCards = (TableLayout) findViewById(R.id.tblCards);
+
+            TableRow.LayoutParams rowLayout =
+                    new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT,  TableRow.LayoutParams.WRAP_CONTENT);
+            TableLayout.LayoutParams tableLayout =
+                    new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT,TableLayout.LayoutParams.WRAP_CONTENT);
+
+            for (int i = 0; i <= card.length() - 1; i++) {
+                //Declare this as final so that the thread at the end can access it.
+                final TableRow tr = new TableRow(context);
+                tr.setLayoutParams(tableLayout);
+                String cardTitle = null;
+                String cardImageUrl = null;
+
+                try {
+                    JSONObject cardObject = card.getJSONObject(i);
+                    cardTitle = cardObject.get("title").toString();
+                    cardImageUrl = getResources().getString(R.string.netrunner_db_url) + cardObject.get("imagesrc").toString();
+                    Log.d(TAG, cardImageUrl);
+                } catch (JSONException e) {
+                    Log.d(TAG, "Card JSONException: " + e.getMessage());
+                }
+
+                //Add Card Image. This will download the image, so it can only be done on the async thread.
+                ImageView cardImage = new ImageView(context);
+                try {
+                    Bitmap bmp = BitmapFactory.decodeStream((InputStream) new URL(cardImageUrl).getContent());
+                    cardImage.setImageBitmap(bmp);
+                } catch (MalformedURLException e) {
+                    Log.d(TAG, e.getMessage());
+                } catch (IOException e) {
+                    Log.d(TAG, e.getMessage());
+                }
+                cardImage.setLayoutParams(rowLayout);
+                tr.addView(cardImage);
+
+                //Add Card Title
+                TextView cardName = new TextView(context);
+                cardName.setText(cardTitle);
+                cardName.setTextColor(Color.BLACK);
+                cardName.setLayoutParams(rowLayout);
+                tr.addView(cardName);
+
+                //Add row to table.
+                //This is done with a thread like this because the async thread can't update the UI
+                //that was created on another thread (in this case the UI thread).
+                new Thread() {
+                    @Override
+                    public void run() {
+                        synchronized (this) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    tblCards.addView(tr);
+                                }
+                            });
+                        }
+                    }
+                }.start();
+            }
         }
 
         private JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {
             //URL for Netrunner DB for the card.
-            String apiUrl = getResources().getString(R.string.netrunner_db_url) + api + "/" + code;
+            String apiUrl = getResources().getString(R.string.netrunner_db_url) + "api/" + api + "/" + code;
 
             //Set up the major variables so they can be properly disposed of later.
             HttpURLConnection connection  = null;
