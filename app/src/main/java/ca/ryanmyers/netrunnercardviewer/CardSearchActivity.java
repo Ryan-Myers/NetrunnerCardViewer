@@ -7,24 +7,19 @@ import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.util.JsonReader;
 import android.content.Context;
+import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
-import android.util.Log;
 
 
 public class CardSearchActivity extends ActionBarActivity {
