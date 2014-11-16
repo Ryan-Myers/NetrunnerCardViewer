@@ -17,6 +17,10 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import com.crashlytics.android.Crashlytics;
+import com.mopub.common.MoPub;
+import io.fabric.sdk.android.Fabric;
+import com.mopub.mobileads.MoPubView;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,12 +36,19 @@ import org.json.JSONObject;
 
 public class CardSearchActivity extends ActionBarActivity {
     private static final String TAG = "NetrunnerCardActivity";
+    // TODO: Replace this test id with your personal ad unit id
+    private static final String MOPUB_BANNER_AD_UNIT_ID = "d4a0aba637d64a9f9a05a575fa757ac2";
+    private MoPubView moPubView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Fabric.with(this, new Crashlytics(), new MoPub());
         //Show the layout.
         setContentView(R.layout.activity_card_search);
+        moPubView = (MoPubView) findViewById(R.id.mopub_sample_ad);
+        moPubView.setAdUnitId(MOPUB_BANNER_AD_UNIT_ID);
+        moPubView.loadAd();
     }
 
     /**
@@ -220,5 +231,11 @@ public class CardSearchActivity extends ActionBarActivity {
             default:
                 return super.onOptionsItemSelected(item);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        moPubView.destroy();
+        super.onDestroy();
     }
 }

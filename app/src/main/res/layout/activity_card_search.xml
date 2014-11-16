@@ -8,9 +8,14 @@
 
     <TableLayout
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
+        android:layout_height="100dp"
         android:layout_alignParentTop="true"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
         android:id="@+id/tblCards"></TableLayout>
+    <com.mopub.mobileads.MoPubView
+        android:id="@+id/mopub_sample_ad"
+        android:layout_alignParentBottom="true"
+        android:layout_width="fill_parent"
+        android:layout_height="50dp"/>
 </RelativeLayout>
