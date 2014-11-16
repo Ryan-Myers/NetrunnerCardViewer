@@ -1,18 +1,28 @@
 package ca.ryanmyers.netrunnercardviewer;
 
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.util.JsonReader;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import android.content.Context;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Map;
+
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import android.util.Log;
 
@@ -28,13 +38,91 @@ public class CardSearchActivity extends ActionBarActivity {
     }
 
     protected void addCardsToView() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+
+        if (networkInfo != null && networkInfo.isConnected()) {
+            //String[] test = new String[]{"card", "01001"};
+            //new String[]{"card", "01001"}
+            new DownloadCardTask().execute(new String[]{"card", "01001"});
+        } else {
+            Log.d(TAG, "No Connection!");
+        }
+
         Log.d(TAG, "Clicked Search");
     }
 
-    protected JSONObject readNetrunnerDB(String api, String code) {
-        StringBuilder builder = new StringBuilder();
-        HttpClient client = new DefaultHttpClient();
-        return new JSONObject();
+    private class DownloadCardTask extends AsyncTask<String[], Void, JSONArray> {
+        @Override
+        protected JSONArray doInBackground(String[]... params) {
+            try {
+                for (String[] param : params) {
+                    //param[0] is the API to use
+                    //param[1] is the code to use
+                    return readNetrunnerDB(param[0], param[1]);
+                }
+            } catch (JSONException e) {
+                Log.d(TAG, "JSONException: " + e.getMessage());
+            } catch (IOException ioEx) {
+                Log.d(TAG, "IOException: " + ioEx.getMessage());
+            }
+
+            return new JSONArray();
+        }
+
+        @Override
+        protected void onPostExecute(JSONArray card) {
+            Log.d(TAG, "Card Finished: " + card.toString());
+            super.onPostExecute(card);
+        }
+
+        private JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {
+            String apiUrl = getResources().getString(R.string.netrunner_db_url) + api + "/" + code;
+            HttpURLConnection connection  = null;
+            InputStream content = null;
+            BufferedReader reader = null;
+            StringBuilder builder = new StringBuilder();
+
+            try {
+                URL url = new URL(apiUrl);
+
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setReadTimeout(10000); //milliseconds
+                connection.setConnectTimeout(15000); //^
+                connection.setRequestMethod("GET");
+                connection.setDoInput(true);
+                connection.connect();
+
+                int response = connection.getResponseCode();
+                Log.d(TAG, "The response is: " + response);
+
+                content = connection.getInputStream();
+                reader = new BufferedReader(new InputStreamReader(content));
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    builder.append(line);
+                }
+
+                return new JSONArray(builder.toString());
+
+            } catch (MalformedURLException ex) {
+                Log.d(TAG, "Malformed URL: " + apiUrl + " Message: " + ex.getMessage());
+            } finally {
+                if (connection != null) {
+                    connection .disconnect();
+                }
+                if (content != null) {
+                    content.close();
+                }
+                if (reader != null) {
+                    reader.close();
+                }
+            }
+
+            return new JSONArray();
+        }
     }
 
     @Override
