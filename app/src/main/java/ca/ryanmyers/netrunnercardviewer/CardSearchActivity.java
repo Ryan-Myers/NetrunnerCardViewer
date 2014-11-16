@@ -28,10 +28,14 @@ public class CardSearchActivity extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        //Show the layout.
         setContentView(R.layout.activity_card_search);
     }
 
+    /**
+     * Currently called by clicking search. It will start the download of a cards JSON
+     * if there is a connection available, and add that card to the view.
+     */
     protected void addCardsToView() {
         ConnectivityManager connMgr = (ConnectivityManager)
                 getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -48,6 +52,9 @@ public class CardSearchActivity extends ActionBarActivity {
         Log.d(TAG, "Clicked Search");
     }
 
+    /**
+     * Downloads a single card's JSON async.
+     */
     private class DownloadCardTask extends AsyncTask<String[], Void, JSONArray> {
         @Override
         protected JSONArray doInBackground(String[]... params) {
@@ -73,7 +80,10 @@ public class CardSearchActivity extends ActionBarActivity {
         }
 
         private JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {
+            //URL for Netrunner DB for the card.
             String apiUrl = getResources().getString(R.string.netrunner_db_url) + api + "/" + code;
+
+            //Set up the major variables so they can be properly disposed of later.
             HttpURLConnection connection  = null;
             InputStream content = null;
             BufferedReader reader = null;
@@ -89,9 +99,11 @@ public class CardSearchActivity extends ActionBarActivity {
                 connection.setDoInput(true);
                 connection.connect();
 
+                //TODO: Remove this after debugging is done, or handle 404's.
                 int response = connection.getResponseCode();
                 Log.d(TAG, "The response is: " + response);
 
+                //All of the below to get the content read to a string with no length restrictions.
                 content = connection.getInputStream();
                 reader = new BufferedReader(new InputStreamReader(content));
 
@@ -105,17 +117,13 @@ public class CardSearchActivity extends ActionBarActivity {
             } catch (MalformedURLException ex) {
                 Log.d(TAG, "Malformed URL: " + apiUrl + " Message: " + ex.getMessage());
             } finally {
-                if (connection != null) {
-                    connection .disconnect();
-                }
-                if (content != null) {
-                    content.close();
-                }
-                if (reader != null) {
-                    reader.close();
-                }
+                //Make sure all connections are properly closed, regardless of the outcome of the request.
+                if (connection != null) connection.disconnect();
+                if (content != null)    content.close();
+                if (reader != null)     reader.close();
             }
 
+            //In the event that this was unable to get a result, return a blank array.
             return new JSONArray();
         }
     }
