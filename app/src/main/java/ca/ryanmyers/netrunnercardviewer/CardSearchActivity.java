@@ -36,8 +36,7 @@ import org.json.JSONObject;
 
 public class CardSearchActivity extends ActionBarActivity {
     private static final String TAG = "NetrunnerCardActivity";
-    // TODO: Replace this test id with your personal ad unit id
-    private static final String MOPUB_BANNER_AD_UNIT_ID = "d4a0aba637d64a9f9a05a575fa757ac2";
+    private static final String MOPUB_BANNER_AD_UNIT_ID = "98a9ce7f6a9b47f095747d9b85c00f6f";
     private MoPubView moPubView;
 
     @Override
@@ -46,7 +45,7 @@ public class CardSearchActivity extends ActionBarActivity {
         Fabric.with(this, new Crashlytics(), new MoPub());
         //Show the layout.
         setContentView(R.layout.activity_card_search);
-        moPubView = (MoPubView) findViewById(R.id.mopub_sample_ad);
+        moPubView = (MoPubView) findViewById(R.id.mopub_banner_ad);
         moPubView.setAdUnitId(MOPUB_BANNER_AD_UNIT_ID);
         moPubView.loadAd();
     }
@@ -131,6 +130,8 @@ public class CardSearchActivity extends ActionBarActivity {
                     Log.d(TAG, e.getMessage());
                 }
                 cardImage.setLayoutParams(rowLayout);
+                cardImage.setAdjustViewBounds(true);
+                cardImage.setMaxHeight(100);
                 tr.addView(cardImage);
 
                 //Add Card Title
