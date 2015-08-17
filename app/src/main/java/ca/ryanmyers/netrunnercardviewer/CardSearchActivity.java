@@ -12,6 +12,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.content.Context;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -36,6 +37,7 @@ import org.json.JSONObject;
 
 public class CardSearchActivity extends ActionBarActivity {
     private static final String TAG = "NetrunnerCardActivity";
+    private static final String CARD_IMAGE_TAG = "CardImage";
     private static final String MOPUB_BANNER_AD_UNIT_ID = "98a9ce7f6a9b47f095747d9b85c00f6f";
     private MoPubView moPubView;
 
@@ -62,8 +64,11 @@ public class CardSearchActivity extends ActionBarActivity {
         if (networkInfo != null && networkInfo.isConnected()) {
             //String[] test = new String[]{"card", "01001"};
             //new String[]{"card", "01001"}
+            //TODO: Get a list of cards from NRDB and only download new ones.
+            //TODO: Cache all card images downloaded.
             new DownloadCardTask().execute(new String[]{"card", "01001"});
         } else {
+            //TODO: Properly handle scenarios where no connection is available.
             Log.d(TAG, "No Connection!");
         }
 
@@ -132,6 +137,7 @@ public class CardSearchActivity extends ActionBarActivity {
                 cardImage.setLayoutParams(rowLayout);
                 cardImage.setAdjustViewBounds(true);
                 cardImage.setMaxHeight(100);
+                cardImage.setTag(CARD_IMAGE_TAG);
                 tr.addView(cardImage);
 
                 //Add Card Title
@@ -139,6 +145,20 @@ public class CardSearchActivity extends ActionBarActivity {
                 cardName.setText(cardTitle);
                 cardName.setTextColor(Color.BLACK);
                 cardName.setLayoutParams(rowLayout);
+                tr.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        ImageView cardImage = (ImageView) view.findViewWithTag(CARD_IMAGE_TAG);
+
+                        try {
+                            //TODO: Expand the card image to the full screen here.
+                            Log.d(TAG, "Clicked Noise! - " + cardImage.toString());
+                        } catch (NullPointerException ex) {
+                            //TODO: Handle the scenario where the card image is null.
+                            Log.d(TAG, "Couldn't find an image with the tag.");
+                        }
+                    }
+                });
                 tr.addView(cardName);
 
                 //Add row to table.
