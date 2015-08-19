@@ -4,33 +4,34 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".CardSearchActivity">
+
     <ScrollView
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:scrollbars="none"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="@dimen/activity_mopub_ad_height"
+        android:paddingBottom="@dimen/activity_horizontal_margin"
         android:paddingLeft="@dimen/activity_horizontal_margin"
         android:paddingRight="@dimen/activity_horizontal_margin"
         android:paddingTop="@dimen/activity_vertical_margin"
-        android:paddingBottom="@dimen/activity_horizontal_margin"
-        android:layout_marginBottom="@dimen/activity_mopub_ad_height">
+        android:scrollbars="none">
+
         <TableLayout
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:id="@+id/tblCards">
-        </TableLayout>
+            android:id="@+id/tblCards"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </ScrollView>
+
     <ImageView
         android:id="@+id/expanded_image"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="invisible"
-        android:contentDescription="@string/description_zoom_touch_close" />
+        android:layout_marginBottom="@dimen/activity_mopub_ad_height"
+        android:contentDescription="@string/description_zoom_touch_close"
+        android:visibility="invisible" />
+
     <com.mopub.mobileads.MoPubView
         android:id="@+id/mopub_banner_ad"
-        android:layout_alignParentBottom="true"
-        android:layout_width="fill_parent"
-        android:layout_height="@dimen/activity_mopub_ad_height" />
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/activity_mopub_ad_height"
+        android:layout_alignParentBottom="true" />
 </RelativeLayout>
