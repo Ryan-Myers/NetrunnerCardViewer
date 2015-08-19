@@ -7,5 +7,6 @@
     <string name="title_activity_network">NetworkActivity</string>
     <string name="netrunner_db_url">http://netrunnerdb.com/</string>
     <string name="action_bar_search">Search</string>
+    <string name="description_zoom_touch_close">Touch to close</string>
 
 </resources>
