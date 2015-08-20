@@ -59,7 +59,6 @@ public class CardSearchActivity extends ActionBarActivity {
     // very frequently.
     private int mShortAnimationDuration;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -85,7 +84,8 @@ public class CardSearchActivity extends ActionBarActivity {
             //new String[]{"card", "01001"}
             //TODO: Get a list of cards from NRDB and only download new ones.
             //TODO: Cache all card images downloaded.
-            new DownloadCardTask().execute(new String[]{"card", "01001"});
+            new DownloadCardTask().execute(new String[]{"card", "01001"},
+                    new String[]{"card", "00001"});
         } else {
             //TODO: Properly handle scenarios where no connection is available.
             Log.d(TAG, "No Connection!");
