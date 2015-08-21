@@ -104,7 +104,11 @@ public class CardSearchActivity extends ActionBarActivity {
                 for (String[] param : params) {
                     //param[0] is the API to use
                     //param[1] is the code to use
-                    updateTableView(readNetrunnerDB(param[0], param[1]));
+                    JSONArray card = readNetrunnerDB(param[0], param[1]);
+
+                    updateTableView(card);
+                    CardDatabaseContract card_db = new CardDatabaseContract(getApplicationContext());
+                    card_db.addCard(card);
                 }
             } catch (JSONException e) {
                 Log.d(TAG, "JSONException: " + e.getMessage());

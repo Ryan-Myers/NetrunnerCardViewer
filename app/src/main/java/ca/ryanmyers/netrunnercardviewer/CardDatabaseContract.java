@@ -5,6 +5,8 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.provider.BaseColumns;
 import android.util.Log;
 
@@ -12,21 +14,26 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+
 /**
  * Defines a set up methods for accessing and updating a SQLlite DB for the cards
  */
 public final class CardDatabaseContract {
     public static final String TAG = "NetrunnerDBContract";
+    private Context activity_context;
 
-    // To prevent someone from accidentally instantiating the contract class,
-    // give it an empty constructor.
-    @SuppressWarnings("unused")
-    public CardDatabaseContract() {
+    public CardDatabaseContract(Context context) {
+        this.activity_context = context;
     }
 
     public static abstract class CardEntry implements BaseColumns {
         public static final String TABLE_NAME = "NRDB_Cards";
-        public static final String COLUMN_NAME_LAST_MODIFIED = "last-modified";
+        public static final String COLUMN_NAME_LAST_MODIFIED = "[last-modified]";
+        public static final String SIMPLE_COLUMN_NAME_LAST_MODIFIED = "last-modified";
         public static final String COLUMN_NAME_CODE = "code";
         public static final String COLUMN_NAME_TITLE = "title";
         public static final String COLUMN_NAME_TYPE = "type";
@@ -121,16 +128,19 @@ public final class CardDatabaseContract {
         }
     }
 
-    public void addCard(JSONArray cards, Context context) {
-        CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(context);
+    public void addCard(JSONArray cards) {
+        CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
 
         for (int i = 0; i <= cards.length() - 1; i++) {
             ContentValues cardValues = new ContentValues();
+            String cardImageUrl = null;
+            String cardImageFilePath = null;
 
+            //Attempt to read the card JSON, and prepare it for inserting into the DB.
             try {
                 JSONObject cardObject = cards.getJSONObject(i);
-                cardValues.put(CardEntry.COLUMN_NAME_LAST_MODIFIED, cardObject.get(CardEntry.COLUMN_NAME_LAST_MODIFIED).toString());
+                cardValues.put(CardEntry.COLUMN_NAME_LAST_MODIFIED, cardObject.get(CardEntry.SIMPLE_COLUMN_NAME_LAST_MODIFIED).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_CODE, cardObject.get(CardEntry.COLUMN_NAME_CODE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TITLE, cardObject.get(CardEntry.COLUMN_NAME_TITLE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TYPE, cardObject.get(CardEntry.COLUMN_NAME_TYPE).toString());
@@ -158,18 +168,48 @@ public final class CardDatabaseContract {
                 cardValues.put(CardEntry.COLUMN_NAME_ANCURLINK, cardObject.get(CardEntry.COLUMN_NAME_ANCURLINK).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_URL, cardObject.get(CardEntry.COLUMN_NAME_URL).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_IMAGESRC, cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString());
+
+                //Get the fully qualified URL for the card image.
+                cardImageUrl = this.activity_context.getResources().getString(R.string.netrunner_db_url) +
+                        cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString();
+                //Get the full path and filename of the card image using the card code as the filename.
+                cardImageFilePath = this.activity_context.getResources().getString(R.string.card_image_file_path) +
+                        cardObject.get(CardEntry.COLUMN_NAME_CODE).toString() + ".png";
             } catch (JSONException e) {
                 Log.d(TAG, "Card JSONException: " + e.getMessage());
             }
 
+            //Attempt to insert the card data into the database.
             try {
                 long newRowId;
-                //NULL in the second argument ensures that if there is no data in cardValues,
-                //it doesn't insert a row.
+                //NULL in the second argument ensures that if there is no data in cardValues, it doesn't insert a row.
                 newRowId = db.insert(CardEntry.TABLE_NAME, "null", cardValues);
                 Log.d(TAG, "Inserted a new row with Id: " + newRowId);
             } catch (SQLiteDatabaseLockedException e) {
                 Log.d(TAG, "SQLiteDatabaseLockedException - " + e.getMessage());
+            }
+
+            //Add Card Image. This will download the image, so it can only be done on the async thread.
+            FileOutputStream out = null;
+            try {
+                if (cardImageUrl != null && cardImageFilePath != null) {
+                    Bitmap bmp = BitmapFactory.decodeStream((InputStream) new URL(cardImageUrl).getContent());
+                    out = new FileOutputStream(cardImageFilePath);
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+                } else {
+                    Log.d(TAG, "cardImageUrl or cardImageFilePath is null! CIU: " +
+                            cardImageUrl + " - CIFP: " + cardImageFilePath);
+                }
+            } catch (IOException e) {
+                Log.d(TAG, e.getMessage());
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (IOException ex) {
+                        Log.d(TAG, "Failed to close file - " + ex.getMessage());
+                    }
+                }
             }
         }
     }
