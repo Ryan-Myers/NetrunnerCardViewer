@@ -5,8 +5,6 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.provider.BaseColumns;
 import android.util.Log;
 
@@ -135,7 +133,7 @@ public final class CardDatabaseContract {
         for (int i = 0; i <= cards.length() - 1; i++) {
             ContentValues cardValues = new ContentValues();
             String cardImageUrl = null;
-            String cardImageFilePath = null;
+            String cardImageFileName = null;
 
             //Attempt to read the card JSON, and prepare it for inserting into the DB.
             try {
@@ -173,8 +171,7 @@ public final class CardDatabaseContract {
                 cardImageUrl = this.activity_context.getResources().getString(R.string.netrunner_db_url) +
                         cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString();
                 //Get the full path and filename of the card image using the card code as the filename.
-                cardImageFilePath = this.activity_context.getResources().getString(R.string.card_image_file_path) +
-                        cardObject.get(CardEntry.COLUMN_NAME_CODE).toString() + ".png";
+                cardImageFileName = cardObject.get(CardEntry.COLUMN_NAME_CODE).toString() + ".png";
             } catch (JSONException e) {
                 Log.d(TAG, "Card JSONException: " + e.getMessage());
             }
@@ -190,24 +187,34 @@ public final class CardDatabaseContract {
             }
 
             //Add Card Image. This will download the image, so it can only be done on the async thread.
-            FileOutputStream out = null;
+            FileOutputStream outFile = null;
+            InputStream inFile = null;
             try {
-                if (cardImageUrl != null && cardImageFilePath != null) {
-                    Bitmap bmp = BitmapFactory.decodeStream((InputStream) new URL(cardImageUrl).getContent());
-                    out = new FileOutputStream(cardImageFilePath);
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+                if (cardImageUrl != null && cardImageFileName != null) {
+                    inFile = (InputStream) new URL(cardImageUrl).getContent();
+                    outFile = activity_context.openFileOutput(cardImageFileName, Context.MODE_PRIVATE);
+                    outFile.write(inFile.read());
+                    inFile.close();
                 } else {
-                    Log.d(TAG, "cardImageUrl or cardImageFilePath is null! CIU: " +
-                            cardImageUrl + " - CIFP: " + cardImageFilePath);
+                    Log.d(TAG, "cardImageUrl or cardImageFileName is null! CIU: " +
+                            cardImageUrl + " - CIFP: " + cardImageFileName);
                 }
             } catch (IOException e) {
                 Log.d(TAG, e.getMessage());
             } finally {
-                if (out != null) {
+                if (inFile != null) {
                     try {
-                        out.close();
+                        inFile.close();
                     } catch (IOException ex) {
-                        Log.d(TAG, "Failed to close file - " + ex.getMessage());
+                        Log.d(TAG, "Failed to close inFile - " + ex.getMessage());
+                    }
+                }
+
+                if (outFile != null) {
+                    try {
+                        outFile.close();
+                    } catch (IOException ex) {
+                        Log.d(TAG, "Failed to close outFile - " + ex.getMessage());
                     }
                 }
             }
