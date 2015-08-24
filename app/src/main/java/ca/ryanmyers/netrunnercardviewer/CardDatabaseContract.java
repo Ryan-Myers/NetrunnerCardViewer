@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.URLConnection;
 
 /**
  * Defines a set up methods for accessing and updating a SQLlite DB for the cards
@@ -168,10 +169,55 @@ public final class CardDatabaseContract {
         return cardTitle;
     }
 
+    public String getCardImageURL(String cardCode) {
+        CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
+        SQLiteDatabase db = mDbHelper.getWritableDatabase();
+
+        Cursor cursor = db.query(
+                CardEntry.TABLE_NAME, //Table to query
+                new String[] {CardEntry.COLUMN_NAME_IMAGESRC}, //columns to SELECT
+                CardEntry.COLUMN_NAME_CODE + " = ?", //WHERE
+                new String[] {cardCode}, //WHERE args
+                null, //GROUP BY
+                null, //HAVING
+                null  //ORDER BY
+        );
+
+        //Returns false if it cannot move to the first
+        //TODO: Does this imply the card title wasn't found?
+        if (!cursor.moveToFirst()) {
+            Log.d(TAG, "Couldn't find card " + cardCode);
+            cursor.close();
+            return null;
+        }
+
+        String imageSrc = null;
+
+        try {
+            imageSrc = cursor.getString(cursor.getColumnIndexOrThrow(CardEntry.COLUMN_NAME_IMAGESRC));
+        } catch (CursorIndexOutOfBoundsException e) {
+            Log.d(TAG, "Cursor out of bounds for card " + cardCode);
+        }
+
+        cursor.close();
+
+        return this.activity_context.getResources().getString(R.string.netrunner_db_url) + imageSrc;
+    }
+
     public Bitmap getCardImage(String cardCode) {
         try {
             FileInputStream cardImage = this.activity_context.openFileInput(cardCode + ".png");
+
             Bitmap bmp = BitmapFactory.decodeStream(cardImage);
+
+            if (bmp == null) {
+                Log.d(TAG, "Bitmap is null!");
+                downloadCardImage(getCardImageURL(cardCode), cardCode + ".png");
+                cardImage.close();
+                cardImage = this.activity_context.openFileInput(cardCode + ".png");
+                bmp = BitmapFactory.decodeStream(cardImage);
+            }
+
             cardImage.close();
 
             return bmp;
@@ -182,6 +228,49 @@ public final class CardDatabaseContract {
         }
 
         return null;
+    }
+
+    private void downloadCardImage(String cardImageUrl, String cardImageFileName) {
+        //Add Card Image. This will download the image, so it can only be done on the async thread.
+        FileOutputStream outFile = null;
+        InputStream inFile = null;
+        try {
+            if (cardImageUrl != null && cardImageFileName != null) {
+                Log.d(TAG, "Downloading: " + cardImageUrl);
+                URL url = new URL(cardImageUrl);
+                URLConnection urlConn= url.openConnection();
+                inFile = (InputStream) urlConn.getContent();
+
+                outFile = activity_context.openFileOutput(cardImageFileName, Context.MODE_PRIVATE);
+
+                byte[] buffer = new byte[urlConn.getContentLength()];
+                int bufferLength;
+
+                while ((bufferLength = inFile.read(buffer)) > 0) {
+                    outFile.write(buffer, 0, bufferLength);
+                }
+            } else {
+                Log.d(TAG, "cardImageUrl or cardImageFileName is null!");
+            }
+        } catch (IOException e) {
+            Log.d(TAG, e.getMessage());
+        } finally {
+            if (inFile != null) {
+                try {
+                    inFile.close();
+                } catch (IOException ex) {
+                    Log.d(TAG, "Failed to close inFile - " + ex.getMessage());
+                }
+            }
+
+            if (outFile != null) {
+                try {
+                    outFile.close();
+                } catch (IOException ex) {
+                    Log.d(TAG, "Failed to close outFile - " + ex.getMessage());
+                }
+            }
+        }
     }
 
     public void addCards(JSONArray cards) {
@@ -251,37 +340,7 @@ public final class CardDatabaseContract {
                 Log.d(TAG, "Caught generic DB exception for card - " + cardImageFileName + ": " + e.getMessage());
             }
 
-            //Add Card Image. This will download the image, so it can only be done on the async thread.
-            FileOutputStream outFile = null;
-            InputStream inFile = null;
-            try {
-                if (cardImageUrl != null && cardImageFileName != null) {
-                    inFile = (InputStream) new URL(cardImageUrl).getContent();
-                    outFile = activity_context.openFileOutput(cardImageFileName, Context.MODE_PRIVATE);
-                    outFile.write(inFile.read());
-                    inFile.close();
-                } else {
-                    Log.d(TAG, "cardImageUrl or cardImageFileName is null!");
-                }
-            } catch (IOException e) {
-                Log.d(TAG, e.getMessage());
-            } finally {
-                if (inFile != null) {
-                    try {
-                        inFile.close();
-                    } catch (IOException ex) {
-                        Log.d(TAG, "Failed to close inFile - " + ex.getMessage());
-                    }
-                }
-
-                if (outFile != null) {
-                    try {
-                        outFile.close();
-                    } catch (IOException ex) {
-                        Log.d(TAG, "Failed to close outFile - " + ex.getMessage());
-                    }
-                }
-            }
+            downloadCardImage(cardImageUrl, cardImageFileName);
         }
 
         db.close();
