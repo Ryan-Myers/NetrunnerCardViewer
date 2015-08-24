@@ -106,9 +106,20 @@ public class CardSearchActivity extends ActionBarActivity {
                     //param[1] is the code to use
                     JSONArray card = readNetrunnerDB(param[0], param[1]);
 
-                    updateTableView(card);
-                    CardDatabaseContract card_db = new CardDatabaseContract(getApplicationContext());
-                    card_db.addCard(card);
+                    CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+
+                    //Attempt to find the card title, if it exists then
+                    //the card is already in the DB, so don't add it.
+                    String cardTitle = cardDb.getCardTitle(param[1]);
+                    if (cardTitle == null) {
+                        cardDb.addCards(card);
+                        cardTitle = cardDb.getCardTitle(param[1]);
+                        Log.d(TAG, "Found card title in DB Code: " + param[1] + " - " + cardTitle);
+                    }
+
+                    Bitmap cardImage = cardDb.getCardImage(param[1]);
+
+                    updateTableView(cardTitle, cardImage);
                 }
             } catch (JSONException e) {
                 Log.d(TAG, "JSONException: " + e.getMessage());
@@ -119,8 +130,7 @@ public class CardSearchActivity extends ActionBarActivity {
             return null;
         }
 
-        protected void updateTableView(JSONArray card) {
-            Log.d(TAG, "Card Finished: " + card.toString());
+        protected void updateTableView(String cardTitle, Bitmap cardImage) {
             Context context = getApplicationContext();
 
             //Declare this as final so that the thread at the end can access it.
@@ -131,75 +141,58 @@ public class CardSearchActivity extends ActionBarActivity {
             TableLayout.LayoutParams tableLayout =
                     new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT,TableLayout.LayoutParams.WRAP_CONTENT);
 
-            for (int i = 0; i <= card.length() - 1; i++) {
-                //Declare this as final so that the thread at the end can access it.
-                final TableRow tr = new TableRow(context);
-                tr.setLayoutParams(tableLayout);
-                String cardTitle = null;
-                String cardImageUrl = null;
+            //Declare this as final so that the thread at the end can access it.
+            final TableRow tr = new TableRow(context);
+            tr.setLayoutParams(tableLayout);
 
-                try {
-                    JSONObject cardObject = card.getJSONObject(i);
-                    cardTitle = cardObject.get("title").toString();
-                    cardImageUrl = getResources().getString(R.string.netrunner_db_url) + cardObject.get("imagesrc").toString();
-                    Log.d(TAG, cardImageUrl);
-                } catch (JSONException e) {
-                    Log.d(TAG, "Card JSONException: " + e.getMessage());
-                }
+            //Add Card Image. This will download the image, so it can only be done on the async thread.
+            ImageView cardImageView = new ImageView(context);
+            cardImageView.setImageBitmap(cardImage);
+            cardImageView.setLayoutParams(rowLayout);
+            cardImageView.setAdjustViewBounds(true);
+            cardImageView.setMaxHeight(100);
+            cardImageView.setTag(CARD_IMAGE_TAG);
+            tr.addView(cardImageView);
 
-                //Add Card Image. This will download the image, so it can only be done on the async thread.
-                ImageView cardImage = new ImageView(context);
-                try {
-                    Bitmap bmp = BitmapFactory.decodeStream((InputStream) new URL(cardImageUrl).getContent());
-                    cardImage.setImageBitmap(bmp);
-                } catch (IOException e) {
-                    Log.d(TAG, e.getMessage());
-                }
-                cardImage.setLayoutParams(rowLayout);
-                cardImage.setAdjustViewBounds(true);
-                cardImage.setMaxHeight(100);
-                cardImage.setTag(CARD_IMAGE_TAG);
-                tr.addView(cardImage);
+            //Add Card Title
+            TextView cardName = new TextView(context);
+            cardName.setText(cardTitle);
+            cardName.setTextColor(Color.BLACK);
+            cardName.setLayoutParams(rowLayout);
+            tr.addView(cardName);
 
-                //Add Card Title
-                TextView cardName = new TextView(context);
-                cardName.setText(cardTitle);
-                cardName.setTextColor(Color.BLACK);
-                cardName.setLayoutParams(rowLayout);
-                tr.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        ImageView cardImage = (ImageView) view.findViewWithTag(CARD_IMAGE_TAG);
+            tr.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    ImageView cardImage = (ImageView) view.findViewWithTag(CARD_IMAGE_TAG);
 
-                        try {
-                            //TODO: Expand the card image to the full screen here.
-                            Log.d(TAG, "Clicked Noise! - " + cardImage.toString());
-                            zoomImageFromThumb(cardImage);
-                        } catch (NullPointerException ex) {
-                            //TODO: Handle the scenario where the card image is null.
-                            Log.d(TAG, "Couldn't find an image with the tag.");
-                        }
+                    try {
+                        //TODO: Expand the card image to the full screen here.
+                        Log.d(TAG, "Clicked Noise! - " + cardImage.toString());
+                        zoomImageFromThumb(cardImage);
+                    } catch (NullPointerException ex) {
+                        //TODO: Handle the scenario where the card image is null.
+                        Log.d(TAG, "Couldn't find an image with the tag.");
                     }
-                });
-                tr.addView(cardName);
+                }
+            });
 
-                //Add row to table.
-                //This is done with a thread like this because the async thread can't update the UI
-                //that was created on another thread (in this case the UI thread).
-                new Thread() {
-                    @Override
-                    public void run() {
-                        synchronized (this) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    tblCards.addView(tr);
-                                }
-                            });
-                        }
+            //Add row to table.
+            //This is done with a thread like this because the async thread can't update the UI
+            //that was created on another thread (in this case the UI thread).
+            new Thread() {
+                @Override
+                public void run() {
+                    synchronized (this) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tblCards.addView(tr);
+                            }
+                        });
                     }
-                }.start();
-            }
+                }
+            }.start();
         }
 
         private JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {

@@ -2,9 +2,14 @@ package ca.ryanmyers.netrunnercardviewer;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
+import android.database.CursorIndexOutOfBoundsException;
+import android.database.sqlite.SQLiteConstraintException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.provider.BaseColumns;
 import android.util.Log;
 
@@ -12,6 +17,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,8 +28,8 @@ import java.net.URL;
  * Defines a set up methods for accessing and updating a SQLlite DB for the cards
  */
 public final class CardDatabaseContract {
-    public static final String TAG = "NetrunnerDBContract";
-    private Context activity_context;
+    private static final String TAG = "NetrunnerDBContract";
+    private final Context activity_context;
 
     public CardDatabaseContract(Context context) {
         this.activity_context = context;
@@ -69,7 +76,7 @@ public final class CardDatabaseContract {
             "CREATE TABLE IF NOT EXISTS " + CardEntry.TABLE_NAME + " (" +
                     CardEntry._ID + INTEGER_TYPE + " PRIMARY KEY" + COMMA_SEP +
                     CardEntry.COLUMN_NAME_LAST_MODIFIED + TEXT_TYPE + COMMA_SEP +
-                    CardEntry.COLUMN_NAME_CODE + TEXT_TYPE + COMMA_SEP +
+                    CardEntry.COLUMN_NAME_CODE + TEXT_TYPE + " UNIQUE " + COMMA_SEP +
                     CardEntry.COLUMN_NAME_TITLE + TEXT_TYPE + COMMA_SEP +
                     CardEntry.COLUMN_NAME_TYPE + TEXT_TYPE + COMMA_SEP +
                     CardEntry.COLUMN_NAME_TYPE_CODE + TEXT_TYPE + COMMA_SEP +
@@ -126,7 +133,58 @@ public final class CardDatabaseContract {
         }
     }
 
-    public void addCard(JSONArray cards) {
+    public String getCardTitle(String cardCode) {
+        CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
+        SQLiteDatabase db = mDbHelper.getWritableDatabase();
+
+        Cursor cursor = db.query(
+                CardEntry.TABLE_NAME, //Table to query
+                new String[] {CardEntry.COLUMN_NAME_TITLE}, //columns to SELECT
+                CardEntry.COLUMN_NAME_CODE + " = ?", //WHERE
+                new String[] {cardCode}, //WHERE args
+                null, //GROUP BY
+                null, //HAVING
+                null  //ORDER BY
+        );
+
+        //Returns false if it cannot move to the first
+        //TODO: Does this imply the card title wasn't found?
+        if (!cursor.moveToFirst()) {
+            Log.d(TAG, "Couldn't find card " + cardCode);
+            cursor.close();
+            return null;
+        }
+
+        String cardTitle = null;
+
+        try {
+            cardTitle = cursor.getString(cursor.getColumnIndexOrThrow(CardEntry.COLUMN_NAME_TITLE));
+        } catch (CursorIndexOutOfBoundsException e) {
+            Log.d(TAG, "Cursor out of bounds for card " + cardCode);
+        }
+
+        cursor.close();
+
+        return cardTitle;
+    }
+
+    public Bitmap getCardImage(String cardCode) {
+        try {
+            FileInputStream cardImage = this.activity_context.openFileInput(cardCode + ".png");
+            Bitmap bmp = BitmapFactory.decodeStream(cardImage);
+            cardImage.close();
+
+            return bmp;
+        } catch (FileNotFoundException e) {
+            Log.d(TAG, "Could not find file " + cardCode + ".png");
+        } catch (IOException ex) {
+            Log.d(TAG, "Could not decode file " + cardCode + ".png");
+        }
+
+        return null;
+    }
+
+    public void addCards(JSONArray cards) {
         CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
 
@@ -181,9 +239,16 @@ public final class CardDatabaseContract {
                 long newRowId;
                 //NULL in the second argument ensures that if there is no data in cardValues, it doesn't insert a row.
                 newRowId = db.insert(CardEntry.TABLE_NAME, "null", cardValues);
-                Log.d(TAG, "Inserted a new row with Id: " + newRowId);
+
+                if (newRowId != -1) {
+                    Log.d(TAG, "Inserted a new row with Id: " + newRowId);
+                }
             } catch (SQLiteDatabaseLockedException e) {
                 Log.d(TAG, "SQLiteDatabaseLockedException - " + e.getMessage());
+            } catch (SQLiteConstraintException e) {
+                Log.d(TAG, "Did not insert duplicate card " + cardImageFileName);
+            } catch (Exception e) {
+                Log.d(TAG, "Caught generic DB exception for card - " + cardImageFileName + ": " + e.getMessage());
             }
 
             //Add Card Image. This will download the image, so it can only be done on the async thread.
@@ -196,8 +261,7 @@ public final class CardDatabaseContract {
                     outFile.write(inFile.read());
                     inFile.close();
                 } else {
-                    Log.d(TAG, "cardImageUrl or cardImageFileName is null! CIU: " +
-                            cardImageUrl + " - CIFP: " + cardImageFileName);
+                    Log.d(TAG, "cardImageUrl or cardImageFileName is null!");
                 }
             } catch (IOException e) {
                 Log.d(TAG, e.getMessage());
@@ -219,5 +283,7 @@ public final class CardDatabaseContract {
                 }
             }
         }
+
+        db.close();
     }
 }
