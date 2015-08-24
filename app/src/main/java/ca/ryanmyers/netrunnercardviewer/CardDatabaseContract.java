@@ -133,14 +133,14 @@ public final class CardDatabaseContract {
             onUpgrade(db, oldVersion, newVersion);
         }
     }
-
-    public String getCardTitle(String cardCode) {
+    
+    private String getSingleValue(String cardCode, String columnToSelect) {
         CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
 
         Cursor cursor = db.query(
                 CardEntry.TABLE_NAME, //Table to query
-                new String[] {CardEntry.COLUMN_NAME_TITLE}, //columns to SELECT
+                new String[]{columnToSelect},
                 CardEntry.COLUMN_NAME_CODE + " = ?", //WHERE
                 new String[] {cardCode}, //WHERE args
                 null, //GROUP BY
@@ -149,57 +149,31 @@ public final class CardDatabaseContract {
         );
 
         //Returns false if it cannot move to the first
-        //TODO: Does this imply the card title wasn't found?
         if (!cursor.moveToFirst()) {
             Log.d(TAG, "Couldn't find card " + cardCode);
             cursor.close();
             return null;
         }
 
-        String cardTitle = null;
+        String columnData = null;
 
         try {
-            cardTitle = cursor.getString(cursor.getColumnIndexOrThrow(CardEntry.COLUMN_NAME_TITLE));
+            columnData = cursor.getString(cursor.getColumnIndexOrThrow(columnToSelect));
         } catch (CursorIndexOutOfBoundsException e) {
             Log.d(TAG, "Cursor out of bounds for card " + cardCode);
         }
 
         cursor.close();
 
-        return cardTitle;
+        return columnData;
+    }
+
+    public String getCardTitle(String cardCode) {
+        return this.getSingleValue(cardCode, CardEntry.COLUMN_NAME_TITLE);
     }
 
     public String getCardImageURL(String cardCode) {
-        CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
-        SQLiteDatabase db = mDbHelper.getWritableDatabase();
-
-        Cursor cursor = db.query(
-                CardEntry.TABLE_NAME, //Table to query
-                new String[] {CardEntry.COLUMN_NAME_IMAGESRC}, //columns to SELECT
-                CardEntry.COLUMN_NAME_CODE + " = ?", //WHERE
-                new String[] {cardCode}, //WHERE args
-                null, //GROUP BY
-                null, //HAVING
-                null  //ORDER BY
-        );
-
-        //Returns false if it cannot move to the first
-        //TODO: Does this imply the card title wasn't found?
-        if (!cursor.moveToFirst()) {
-            Log.d(TAG, "Couldn't find card " + cardCode);
-            cursor.close();
-            return null;
-        }
-
-        String imageSrc = null;
-
-        try {
-            imageSrc = cursor.getString(cursor.getColumnIndexOrThrow(CardEntry.COLUMN_NAME_IMAGESRC));
-        } catch (CursorIndexOutOfBoundsException e) {
-            Log.d(TAG, "Cursor out of bounds for card " + cardCode);
-        }
-
-        cursor.close();
+        String imageSrc = this.getSingleValue(cardCode, CardEntry.COLUMN_NAME_IMAGESRC);
 
         return this.activity_context.getResources().getString(R.string.netrunner_db_url) + imageSrc;
     }
