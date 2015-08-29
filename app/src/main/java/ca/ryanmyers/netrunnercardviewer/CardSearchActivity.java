@@ -75,49 +75,144 @@ public class CardSearchActivity extends ActionBarActivity {
      * if there is a connection available, and add that card to the view.
      */
     protected void addCardsToView() {
+        Log.d(TAG, "Clicked Search");
+        downloadCardList();
+    }
+
+    protected void downloadCardList() {
         ConnectivityManager connMgr = (ConnectivityManager)
                 getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
 
         if (networkInfo != null && networkInfo.isConnected()) {
-            //String[] test = new String[]{"card", "01001"};
-            //new String[]{"card", "01001"}
-            //TODO: Get a list of cards from NRDB and only download new ones.
-            //TODO: Cache all card images downloaded.
-            new DownloadCardTask().execute(new String[]{"card", "01001"},
-                    new String[]{"card", "00001"});
+            new downloadCardList().execute("cards", "");
         } else {
             //TODO: Properly handle scenarios where no connection is available.
             Log.d(TAG, "No Connection!");
         }
+    }
 
-        Log.d(TAG, "Clicked Search");
+    protected String[] getCardCodesFromJSON(JSONArray cardList) throws JSONException {
+        String[] cardCodes = new String[cardList.length()];
+
+        for (int i = 0; i <= cardList.length() - 1; i++) {
+            JSONObject cardObject = cardList.getJSONObject(i);
+            cardCodes[i] = cardObject.getString("code");
+        }
+
+        return cardCodes;
+    }
+
+    protected JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {
+        //URL for Netrunner DB for the card.
+        String apiUrl = getResources().getString(R.string.netrunner_db_url) + "api/" + api + "/" + code;
+
+        //Set up the major variables so they can be properly disposed of later.
+        HttpURLConnection connection  = null;
+        InputStream content = null;
+        BufferedReader reader = null;
+        StringBuilder builder = new StringBuilder();
+
+        try {
+            URL url = new URL(apiUrl);
+
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setReadTimeout(10000); //milliseconds
+            connection.setConnectTimeout(150000); //^
+            connection.setRequestMethod("GET");
+            connection.setDoInput(true);
+            connection.connect();
+
+            //TODO: Remove this after debugging is done, or handle 404's.
+            int response = connection.getResponseCode();
+            Log.d(TAG, "The response is: " + response);
+
+            //All of the below to get the content read to a string with no length restrictions.
+            content = connection.getInputStream();
+            reader = new BufferedReader(new InputStreamReader(content));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line);
+            }
+
+            return new JSONArray(builder.toString());
+
+        } catch (MalformedURLException ex) {
+            Log.d(TAG, "Malformed URL: " + apiUrl + " Message: " + ex.getMessage());
+        } finally {
+            //Make sure all connections are properly closed, regardless of the outcome of the request.
+            if (connection != null) connection.disconnect();
+            if (content != null)    content.close();
+            if (reader != null)     reader.close();
+        }
+
+        //In the event that this was unable to get a result, return a blank array.
+        return new JSONArray();
     }
 
     /**
      * Downloads a single card's JSON async.
      */
-    private class DownloadCardTask extends AsyncTask<String[], Void, Void> {
+    private class downloadCardList extends AsyncTask<String, Void, JSONArray> {
         @Override
-        protected Void doInBackground(String[]... params) {
+        protected JSONArray doInBackground(String... params) {
+            String apiCode = params[0];
+            String cardCode = params[1];
+
             try {
-                for (String[] param : params) {
-                    //param[0] is the API to use
-                    //param[1] is the code to use
-                    JSONArray card = readNetrunnerDB(param[0], param[1]);
+                JSONArray cardList = readNetrunnerDB(apiCode, cardCode);
 
-                    CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+                CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+                cardDb.addCards(cardList);
 
+                return cardList;
+            } catch (IOException e) {
+                //TODO: Handle the error by telling the end user that we cannot download cards list right now.
+                Log.d(TAG, "Unable to download cards");
+                e.printStackTrace();
+            } catch (JSONException e) {
+                //TODO: Handle the error by telling the end user that we cannot parse cards list right now. (Problem with NRDB)
+                Log.d(TAG, "Unable to parse cards");
+                e.printStackTrace();
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(JSONArray cardList) {
+            try {
+                new AddCardsToView().execute(getCardCodesFromJSON(cardList));
+            } catch (JSONException e) {
+                //TODO: Handle the error by telling the end user that we cannot parse cards list right now. (Problem with NRDB)
+                Log.d(TAG, "Unable to parse cards");
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Downloads a single card's JSON async.
+     */
+    private class AddCardsToView extends AsyncTask<String, Void, Void> {
+        @Override
+        protected Void doInBackground(String[] cardCodes) {
+            try {
+                CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+
+                for (String cardCode : cardCodes) {
                     //Attempt to find the card title, if it exists then
                     //the card is already in the DB, so don't add it.
-                    String cardTitle = cardDb.getCardTitle(param[1]);
+                    String cardTitle = cardDb.getCardTitle(cardCode);
                     if (cardTitle == null) {
+                        JSONArray card = readNetrunnerDB("card", cardCode);
                         cardDb.addCards(card);
-                        cardTitle = cardDb.getCardTitle(param[1]);
-                        Log.d(TAG, "Found card title in DB Code: " + param[1] + " - " + cardTitle);
+                        cardTitle = cardDb.getCardTitle(cardCode);
+                        Log.d(TAG, "Found card title in DB Code: " + cardCode + " - " + cardTitle);
                     }
 
-                    Bitmap cardImage = cardDb.getCardImage(param[1]);
+                    Bitmap cardImage = cardDb.getCardImage(cardCode);
 
                     updateTableView(cardTitle, cardImage);
                 }
@@ -193,54 +288,6 @@ public class CardSearchActivity extends ActionBarActivity {
                     }
                 }
             }.start();
-        }
-
-        private JSONArray readNetrunnerDB(String api, String code) throws IOException, JSONException {
-            //URL for Netrunner DB for the card.
-            String apiUrl = getResources().getString(R.string.netrunner_db_url) + "api/" + api + "/" + code;
-
-            //Set up the major variables so they can be properly disposed of later.
-            HttpURLConnection connection  = null;
-            InputStream content = null;
-            BufferedReader reader = null;
-            StringBuilder builder = new StringBuilder();
-
-            try {
-                URL url = new URL(apiUrl);
-
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setReadTimeout(10000); //milliseconds
-                connection.setConnectTimeout(15000); //^
-                connection.setRequestMethod("GET");
-                connection.setDoInput(true);
-                connection.connect();
-
-                //TODO: Remove this after debugging is done, or handle 404's.
-                int response = connection.getResponseCode();
-                Log.d(TAG, "The response is: " + response);
-
-                //All of the below to get the content read to a string with no length restrictions.
-                content = connection.getInputStream();
-                reader = new BufferedReader(new InputStreamReader(content));
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    builder.append(line);
-                }
-
-                return new JSONArray(builder.toString());
-
-            } catch (MalformedURLException ex) {
-                Log.d(TAG, "Malformed URL: " + apiUrl + " Message: " + ex.getMessage());
-            } finally {
-                //Make sure all connections are properly closed, regardless of the outcome of the request.
-                if (connection != null) connection.disconnect();
-                if (content != null)    content.close();
-                if (reader != null)     reader.close();
-            }
-
-            //In the event that this was unable to get a result, return a blank array.
-            return new JSONArray();
         }
     }
 

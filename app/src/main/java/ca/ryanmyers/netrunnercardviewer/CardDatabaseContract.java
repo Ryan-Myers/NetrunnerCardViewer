@@ -259,9 +259,13 @@ public final class CardDatabaseContract {
             //Attempt to read the card JSON, and prepare it for inserting into the DB.
             try {
                 JSONObject cardObject = cards.getJSONObject(i);
+
+
+
                 cardValues.put(CardEntry.COLUMN_NAME_LAST_MODIFIED, cardObject.get(CardEntry.SIMPLE_COLUMN_NAME_LAST_MODIFIED).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_CODE, cardObject.get(CardEntry.COLUMN_NAME_CODE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TITLE, cardObject.get(CardEntry.COLUMN_NAME_TITLE).toString());
+                /*
                 cardValues.put(CardEntry.COLUMN_NAME_TYPE, cardObject.get(CardEntry.COLUMN_NAME_TYPE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TYPE_CODE, cardObject.get(CardEntry.COLUMN_NAME_TYPE_CODE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_SUBTYPE, cardObject.get(CardEntry.COLUMN_NAME_SUBTYPE).toString());
@@ -287,7 +291,7 @@ public final class CardDatabaseContract {
                 cardValues.put(CardEntry.COLUMN_NAME_ANCURLINK, cardObject.get(CardEntry.COLUMN_NAME_ANCURLINK).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_URL, cardObject.get(CardEntry.COLUMN_NAME_URL).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_IMAGESRC, cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString());
-
+                */
                 //Get the fully qualified URL for the card image.
                 cardImageUrl = this.activity_context.getResources().getString(R.string.netrunner_db_url) +
                         cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString();
