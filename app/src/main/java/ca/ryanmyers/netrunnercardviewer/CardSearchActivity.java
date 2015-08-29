@@ -198,28 +198,15 @@ public class CardSearchActivity extends ActionBarActivity {
     private class AddCardsToView extends AsyncTask<String, Void, Void> {
         @Override
         protected Void doInBackground(String[] cardCodes) {
-            try {
-                CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+            CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
 
-                for (String cardCode : cardCodes) {
-                    //Attempt to find the card title, if it exists then
-                    //the card is already in the DB, so don't add it.
-                    String cardTitle = cardDb.getCardTitle(cardCode);
-                    if (cardTitle == null) {
-                        JSONArray card = readNetrunnerDB("card", cardCode);
-                        cardDb.addCards(card);
-                        cardTitle = cardDb.getCardTitle(cardCode);
-                        Log.d(TAG, "Found card title in DB Code: " + cardCode + " - " + cardTitle);
-                    }
+            for (String cardCode : cardCodes) {
+                //Attempt to find the card title, if it exists then
+                //the card is already in the DB, so don't add it.
+                String cardTitle = cardDb.getCardTitle(cardCode);
+                Bitmap cardImage = cardDb.getCardImage(cardCode);
 
-                    Bitmap cardImage = cardDb.getCardImage(cardCode);
-
-                    updateTableView(cardTitle, cardImage);
-                }
-            } catch (JSONException e) {
-                Log.d(TAG, "JSONException: " + e.getMessage());
-            } catch (IOException ioEx) {
-                Log.d(TAG, "IOException: " + ioEx.getMessage());
+                updateTableView(cardTitle, cardImage);
             }
 
             return null;

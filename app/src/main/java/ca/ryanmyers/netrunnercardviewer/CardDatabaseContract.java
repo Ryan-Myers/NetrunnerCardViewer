@@ -17,6 +17,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -164,6 +165,7 @@ public final class CardDatabaseContract {
         }
 
         cursor.close();
+        db.close();
 
         return columnData;
     }
@@ -255,6 +257,7 @@ public final class CardDatabaseContract {
             ContentValues cardValues = new ContentValues();
             String cardImageUrl = null;
             String cardImageFileName = null;
+            String cardCode = null;
 
             //Attempt to read the card JSON, and prepare it for inserting into the DB.
             try {
@@ -292,23 +295,31 @@ public final class CardDatabaseContract {
                 cardValues.put(CardEntry.COLUMN_NAME_URL, cardObject.get(CardEntry.COLUMN_NAME_URL).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_IMAGESRC, cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString());
                 */
+
+                cardCode = cardObject.get(CardEntry.COLUMN_NAME_CODE).toString();
+
                 //Get the fully qualified URL for the card image.
                 cardImageUrl = this.activity_context.getResources().getString(R.string.netrunner_db_url) +
                         cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString();
                 //Get the full path and filename of the card image using the card code as the filename.
-                cardImageFileName = cardObject.get(CardEntry.COLUMN_NAME_CODE).toString() + ".png";
+                cardImageFileName = cardCode + ".png";
             } catch (JSONException e) {
                 Log.d(TAG, "Card JSONException: " + e.getMessage());
             }
 
             //Attempt to insert the card data into the database.
             try {
-                long newRowId;
-                //NULL in the second argument ensures that if there is no data in cardValues, it doesn't insert a row.
-                newRowId = db.insert(CardEntry.TABLE_NAME, "null", cardValues);
+                //Don't attempt to write a duplicate card.
+                if (getCardTitle(cardCode) == null) {
+                    long newRowId;
+                    //NULL in the second argument ensures that if there is no data in cardValues, it doesn't insert a row.
+                    newRowId = db.insert(CardEntry.TABLE_NAME, "null", cardValues);
 
-                if (newRowId != -1) {
-                    Log.d(TAG, "Inserted a new row with Id: " + newRowId);
+                    if (newRowId != -1) {
+                        Log.d(TAG, "Inserted a new row with Id: " + newRowId);
+                    }
+                } else {
+                    Log.d(TAG, "Not inserting duplicate card code: " + cardCode);
                 }
             } catch (SQLiteDatabaseLockedException e) {
                 Log.d(TAG, "SQLiteDatabaseLockedException - " + e.getMessage());
@@ -318,7 +329,17 @@ public final class CardDatabaseContract {
                 Log.d(TAG, "Caught generic DB exception for card - " + cardImageFileName + ": " + e.getMessage());
             }
 
-            downloadCardImage(cardImageUrl, cardImageFileName);
+            if (cardImageFileName != null) {
+                File cardImage = new File(activity_context.getFilesDir() + "/" + cardImageFileName);
+
+                if (!cardImage.exists()) {
+                    Log.d(TAG, "Couldn't find existing card image - " +
+                            activity_context.getFilesDir() + "/" + cardImageFileName);
+                    downloadCardImage(cardImageUrl, cardImageFileName);
+                } else {
+                    Log.d(TAG, "Not redownloading card image - " + cardImageFileName);
+                }
+            }
         }
 
         db.close();
