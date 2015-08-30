@@ -180,7 +180,7 @@ public final class CardDatabaseContract {
         return this.activity_context.getResources().getString(R.string.netrunner_db_url) + imageSrc;
     }
 
-    public Bitmap getCardImage(String cardCode) {
+    public Bitmap getFullCardImage(String cardCode) {
         try {
             FileInputStream cardImage = this.activity_context.openFileInput(cardCode + ".png");
 
@@ -206,6 +206,10 @@ public final class CardDatabaseContract {
         return null;
     }
 
+    public Bitmap getSmallCardImage(String cardCode) {
+        return getFullCardImage("shrunk-" + cardCode);
+    }
+
     private void downloadCardImage(String cardImageUrl, String cardImageFileName) {
         //Add Card Image. This will download the image, so it can only be done on the async thread.
         FileOutputStream outFile = null;
@@ -225,6 +229,8 @@ public final class CardDatabaseContract {
                 while ((bufferLength = inFile.read(buffer)) > 0) {
                     outFile.write(buffer, 0, bufferLength);
                 }
+
+                resizeCardImage(cardImageFileName);
             } else {
                 Log.d(TAG, "cardImageUrl or cardImageFileName is null!");
             }
@@ -249,6 +255,24 @@ public final class CardDatabaseContract {
         }
     }
 
+    private void resizeCardImage(String cardImageFileName) {
+        try {
+            String cardCode = cardImageFileName.replace(".png", "");
+            Bitmap scaledCardImage =Bitmap.createScaledBitmap(getFullCardImage(cardCode), 72, 100, true);
+
+            File shrunkImage = new File(activity_context.getFilesDir() + "/shrunk-" + cardImageFileName);
+            if (shrunkImage.createNewFile()) {
+                FileOutputStream shrunkImageOS = new FileOutputStream(shrunkImage);
+                scaledCardImage.compress(Bitmap.CompressFormat.PNG, 90, shrunkImageOS);
+                shrunkImageOS.close();
+            } else {
+                Log.d(TAG, "Unable to create new shrunk image file! - " + cardImageFileName);
+            }
+        } catch (IOException e) {
+            Log.d(TAG, "Unable to create new shrunk image file! - " + cardImageFileName);
+        }
+    }
+
     public void addCards(JSONArray cards) {
         CardDatabaseDbHelper mDbHelper = new CardDatabaseDbHelper(activity_context);
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -262,8 +286,6 @@ public final class CardDatabaseContract {
             //Attempt to read the card JSON, and prepare it for inserting into the DB.
             try {
                 JSONObject cardObject = cards.getJSONObject(i);
-
-
 
                 cardValues.put(CardEntry.COLUMN_NAME_LAST_MODIFIED, cardObject.get(CardEntry.SIMPLE_COLUMN_NAME_LAST_MODIFIED).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_CODE, cardObject.get(CardEntry.COLUMN_NAME_CODE).toString());

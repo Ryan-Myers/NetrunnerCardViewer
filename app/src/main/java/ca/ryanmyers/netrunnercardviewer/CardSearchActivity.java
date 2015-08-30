@@ -57,7 +57,7 @@ public class CardSearchActivity extends ActionBarActivity {
     // The system "short" animation time duration, in milliseconds. This
     // duration is ideal for subtle animations or animations that occur
     // very frequently.
-    private int mShortAnimationDuration;
+    private int mShortAnimationDuration = 20;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,7 +152,7 @@ public class CardSearchActivity extends ActionBarActivity {
     }
 
     /**
-     * Downloads a single card's JSON async.
+     * Downloads all cards, and adds them to the view
      */
     private class downloadCardList extends AsyncTask<String, Void, JSONArray> {
         @Override
@@ -183,7 +183,9 @@ public class CardSearchActivity extends ActionBarActivity {
         @Override
         protected void onPostExecute(JSONArray cardList) {
             try {
-                new AddCardsToView().execute(getCardCodesFromJSON(cardList));
+                for (String cardCode : getCardCodesFromJSON(cardList)) {
+                    new AddCardToView().execute(cardCode);
+                }
             } catch (JSONException e) {
                 //TODO: Handle the error by telling the end user that we cannot parse cards list right now. (Problem with NRDB)
                 Log.d(TAG, "Unable to parse cards");
@@ -193,38 +195,29 @@ public class CardSearchActivity extends ActionBarActivity {
     }
 
     /**
-     * Downloads a single card's JSON async.
+     * Adds a single card (passed with cardCode) to the view
      */
-    private class AddCardsToView extends AsyncTask<String, Void, Void> {
+    private class AddCardToView extends AsyncTask<String, Void, TableRow> {
         @Override
-        protected Void doInBackground(String[] cardCodes) {
+        protected TableRow doInBackground(String... cardCodes) {
             CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+            String cardCode = cardCodes[0];
 
-            for (String cardCode : cardCodes) {
-                //Attempt to find the card title, if it exists then
-                //the card is already in the DB, so don't add it.
-                String cardTitle = cardDb.getCardTitle(cardCode);
-                Bitmap cardImage = cardDb.getCardImage(cardCode);
+            String cardTitle = cardDb.getCardTitle(cardCode);
+            Bitmap cardImage = cardDb.getSmallCardImage(cardCode);
 
-                updateTableView(cardTitle, cardImage);
-            }
-
-            return null;
+            return getCardRow(cardTitle, cardCode, cardImage);
         }
 
-        protected void updateTableView(String cardTitle, Bitmap cardImage) {
+        protected TableRow getCardRow(String cardTitle, final String cardCode, Bitmap cardImage) {
             Context context = getApplicationContext();
-
-            //Declare this as final so that the thread at the end can access it.
-            final TableLayout tblCards = (TableLayout) findViewById(R.id.tblCards);
 
             TableRow.LayoutParams rowLayout =
                     new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT,  TableRow.LayoutParams.WRAP_CONTENT);
             TableLayout.LayoutParams tableLayout =
                     new TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT,TableLayout.LayoutParams.WRAP_CONTENT);
 
-            //Declare this as final so that the thread at the end can access it.
-            final TableRow tr = new TableRow(context);
+            TableRow tr = new TableRow(context);
             tr.setLayoutParams(tableLayout);
 
             //Add Card Image. This will download the image, so it can only be done on the async thread.
@@ -247,38 +240,24 @@ public class CardSearchActivity extends ActionBarActivity {
                 @Override
                 public void onClick(View view) {
                     ImageView cardImage = (ImageView) view.findViewWithTag(CARD_IMAGE_TAG);
-
-                    try {
-                        //TODO: Expand the card image to the full screen here.
-                        Log.d(TAG, "Clicked Noise! - " + cardImage.toString());
-                        zoomImageFromThumb(cardImage);
-                    } catch (NullPointerException ex) {
-                        //TODO: Handle the scenario where the card image is null.
-                        Log.d(TAG, "Couldn't find an image with the tag.");
-                    }
+                    zoomImageFromThumb(cardImage, cardCode);
                 }
             });
 
+            return tr;
+        }
+
+        @Override
+        protected void onPostExecute(TableRow tr) {
             //Add row to table.
-            //This is done with a thread like this because the async thread can't update the UI
+            //This is done on post execute like this because the async thread can't update the UI
             //that was created on another thread (in this case the UI thread).
-            new Thread() {
-                @Override
-                public void run() {
-                    synchronized (this) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                tblCards.addView(tr);
-                            }
-                        });
-                    }
-                }
-            }.start();
+            TableLayout tblCards = (TableLayout) findViewById(R.id.tblCards);
+            tblCards.addView(tr);
         }
     }
 
-    private void zoomImageFromThumb(final ImageView thumbView) {
+    private void zoomImageFromThumb(final ImageView thumbView, String cardCode) {
         // If there's an animation in progress, cancel it
         // immediately and proceed with this one.
         if (mCurrentAnimator != null) {
@@ -288,7 +267,8 @@ public class CardSearchActivity extends ActionBarActivity {
         // Load the high-resolution "zoomed-in" image.
         final ImageView expandedImageView = (ImageView) findViewById(
                 R.id.expanded_image);
-        expandedImageView.setImageBitmap(((BitmapDrawable)thumbView.getDrawable()).getBitmap());
+        CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
+        expandedImageView.setImageBitmap(cardDb.getFullCardImage(cardCode));
 
         // Calculate the starting and ending bounds for the zoomed-in image.
         // This step involves lots of math. Yay, math.
