@@ -200,17 +200,12 @@ public class CardSearchActivity extends ActionBarActivity {
     private class AddCardToView extends AsyncTask<String, Void, TableRow> {
         @Override
         protected TableRow doInBackground(String... cardCodes) {
-            CardDatabaseContract cardDb = new CardDatabaseContract(getApplicationContext());
-            String cardCode = cardCodes[0];
-
-            String cardTitle = cardDb.getCardTitle(cardCode);
-            Bitmap cardImage = cardDb.getSmallCardImage(cardCode);
-
-            return getCardRow(cardTitle, cardCode, cardImage);
+            return getCardRow(cardCodes[0]);
         }
 
-        protected TableRow getCardRow(String cardTitle, final String cardCode, Bitmap cardImage) {
+        protected TableRow getCardRow(final String cardCode) {
             Context context = getApplicationContext();
+            CardDatabaseContract cardDb = new CardDatabaseContract(context);
 
             TableRow.LayoutParams rowLayout =
                     new TableRow.LayoutParams(TableRow.LayoutParams.MATCH_PARENT,  TableRow.LayoutParams.WRAP_CONTENT);
@@ -220,22 +215,31 @@ public class CardSearchActivity extends ActionBarActivity {
             TableRow tr = new TableRow(context);
             tr.setLayoutParams(tableLayout);
 
-            //Add Card Image. This will download the image, so it can only be done on the async thread.
+            /**
+             * Add the small card image to the row
+             */
+            //Download the card if it hasn't already been done.
+            cardDb.downloadCardImage(cardCode);
             ImageView cardImageView = new ImageView(context);
-            cardImageView.setImageBitmap(cardImage);
+            cardImageView.setImageBitmap(cardDb.getSmallCardImage(cardCode));
             cardImageView.setLayoutParams(rowLayout);
             cardImageView.setAdjustViewBounds(true);
             cardImageView.setMaxHeight(100);
             cardImageView.setTag(CARD_IMAGE_TAG);
             tr.addView(cardImageView);
 
-            //Add Card Title
+            /**
+             * Add Card Title
+             */
             TextView cardName = new TextView(context);
-            cardName.setText(cardTitle);
+            cardName.setText(cardDb.getCardTitle(cardCode));
             cardName.setTextColor(Color.BLACK);
             cardName.setLayoutParams(rowLayout);
             tr.addView(cardName);
 
+            /**
+             * Set up the zoom for the card when clicked.
+             */
             tr.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {

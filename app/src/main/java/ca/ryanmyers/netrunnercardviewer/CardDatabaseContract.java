@@ -210,6 +210,20 @@ public final class CardDatabaseContract {
         return getFullCardImage("shrunk-" + cardCode);
     }
 
+    public void downloadCardImage(String cardCode) {
+        String cardImageUrl = getCardImageURL(cardCode);
+        String cardImageFileName = cardCode + ".png";
+        File cardImage = new File(activity_context.getFilesDir() + "/" + cardImageFileName);
+
+        if (!cardImage.exists()) {
+            Log.d(TAG, "Couldn't find existing card image - " +
+                    activity_context.getFilesDir() + "/" + cardImageFileName);
+            downloadCardImage(cardImageUrl, cardImageFileName);
+        } else {
+            Log.d(TAG, "Not redownloading card image - " + cardImageFileName);
+        }
+    }
+
     private void downloadCardImage(String cardImageUrl, String cardImageFileName) {
         //Add Card Image. This will download the image, so it can only be done on the async thread.
         FileOutputStream outFile = null;
@@ -279,8 +293,6 @@ public final class CardDatabaseContract {
 
         for (int i = 0; i <= cards.length() - 1; i++) {
             ContentValues cardValues = new ContentValues();
-            String cardImageUrl = null;
-            String cardImageFileName = null;
             String cardCode = null;
 
             //Attempt to read the card JSON, and prepare it for inserting into the DB.
@@ -290,6 +302,8 @@ public final class CardDatabaseContract {
                 cardValues.put(CardEntry.COLUMN_NAME_LAST_MODIFIED, cardObject.get(CardEntry.SIMPLE_COLUMN_NAME_LAST_MODIFIED).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_CODE, cardObject.get(CardEntry.COLUMN_NAME_CODE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TITLE, cardObject.get(CardEntry.COLUMN_NAME_TITLE).toString());
+                cardValues.put(CardEntry.COLUMN_NAME_IMAGESRC, cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString());
+
                 /*
                 cardValues.put(CardEntry.COLUMN_NAME_TYPE, cardObject.get(CardEntry.COLUMN_NAME_TYPE).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_TYPE_CODE, cardObject.get(CardEntry.COLUMN_NAME_TYPE_CODE).toString());
@@ -315,16 +329,9 @@ public final class CardDatabaseContract {
                 cardValues.put(CardEntry.COLUMN_NAME_CYCLENUMBER, cardObject.get(CardEntry.COLUMN_NAME_CYCLENUMBER).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_ANCURLINK, cardObject.get(CardEntry.COLUMN_NAME_ANCURLINK).toString());
                 cardValues.put(CardEntry.COLUMN_NAME_URL, cardObject.get(CardEntry.COLUMN_NAME_URL).toString());
-                cardValues.put(CardEntry.COLUMN_NAME_IMAGESRC, cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString());
                 */
 
                 cardCode = cardObject.get(CardEntry.COLUMN_NAME_CODE).toString();
-
-                //Get the fully qualified URL for the card image.
-                cardImageUrl = this.activity_context.getResources().getString(R.string.netrunner_db_url) +
-                        cardObject.get(CardEntry.COLUMN_NAME_IMAGESRC).toString();
-                //Get the full path and filename of the card image using the card code as the filename.
-                cardImageFileName = cardCode + ".png";
             } catch (JSONException e) {
                 Log.d(TAG, "Card JSONException: " + e.getMessage());
             }
@@ -346,21 +353,9 @@ public final class CardDatabaseContract {
             } catch (SQLiteDatabaseLockedException e) {
                 Log.d(TAG, "SQLiteDatabaseLockedException - " + e.getMessage());
             } catch (SQLiteConstraintException e) {
-                Log.d(TAG, "Did not insert duplicate card " + cardImageFileName);
+                Log.d(TAG, "Did not insert duplicate card " + cardCode);
             } catch (Exception e) {
-                Log.d(TAG, "Caught generic DB exception for card - " + cardImageFileName + ": " + e.getMessage());
-            }
-
-            if (cardImageFileName != null) {
-                File cardImage = new File(activity_context.getFilesDir() + "/" + cardImageFileName);
-
-                if (!cardImage.exists()) {
-                    Log.d(TAG, "Couldn't find existing card image - " +
-                            activity_context.getFilesDir() + "/" + cardImageFileName);
-                    downloadCardImage(cardImageUrl, cardImageFileName);
-                } else {
-                    Log.d(TAG, "Not redownloading card image - " + cardImageFileName);
-                }
+                Log.d(TAG, "Caught generic DB exception for card - " + cardCode + ": " + e.getMessage());
             }
         }
 
